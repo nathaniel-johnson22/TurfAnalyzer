@@ -30,6 +30,8 @@ def main():
     - Each row represents a potential customer
     - Each column represents a feature
     - Values are binary (0/1 or True/False) indicating if that customer is reached by the feature
+    - First row should contain feature names
+    - Any index column will be automatically ignored
     """)
 
     # Sidebar for data input and controls
@@ -48,24 +50,39 @@ def main():
             )
             if uploaded_file:
                 try:
-                    df = pd.read_csv(uploaded_file)
+                    # Read CSV with pandas, ignore index column if present
+                    df = pd.read_csv(uploaded_file, index_col=0)
                     if validate_data(df):
                         st.success("Data loaded successfully!")
+                        st.write("Data Preview:")
+                        st.write(df.head(3))
+                        st.info(f"Loaded {len(df)} respondents and {len(df.columns)} features")
                     else:
                         st.error("Invalid data format. Please ensure all values are binary (0/1 or True/False).")
                         return
                 except Exception as e:
-                    st.error(f"Error reading file: {str(e)}")
-                    return
+                    # Try reading without index column
+                    try:
+                        df = pd.read_csv(uploaded_file)
+                        if validate_data(df):
+                            st.success("Data loaded successfully!")
+                            st.write("Data Preview:")
+                            st.write(df.head(3))
+                            st.info(f"Loaded {len(df)} respondents and {len(df.columns)} features")
+                        else:
+                            st.error("Invalid data format. Please ensure all values are binary (0/1 or True/False).")
+                            return
+                    except Exception as e:
+                        st.error(f"Error reading file: {str(e)}")
+                        return
         else:
             df = create_sample_data()
             st.info("Sample data loaded!")
             st.write("Preview of sample data:")
             st.write(df.head(3))
 
-    # Main content area
+    # Feature selection
     if 'df' in locals():
-        # Feature selection
         st.header("Feature Selection")
         col1, col2 = st.columns([2, 1])
 
