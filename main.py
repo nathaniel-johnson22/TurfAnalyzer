@@ -4,6 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from turf_analyzer import TURFAnalyzer
 from utils import validate_data, create_sample_data
+import io
+import xlsxwriter
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(
@@ -24,6 +27,87 @@ def get_top_features(df, n=5):
     """Get the top n features by total reach"""
     feature_reach = df.sum().sort_values(ascending=False)
     return feature_reach.index.tolist()[:n]
+
+def create_excel_report(results, df, best_combo, reach_metrics_df, viz_data):
+    """Create a detailed Excel report with charts and tables"""
+    output = io.BytesIO()
+
+    # Create Excel writer object
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        workbook = writer.book
+
+        # Add summary sheet
+        summary_df = pd.DataFrame({
+            'Metric': ['Best Combination', 'Total Reach', 'Reach Percentage', 'Total Respondents'],
+            'Value': [
+                ', '.join(best_combo),
+                f"{results['max_reach']:,.0f}",
+                f"{(results['max_reach'] / results['total_respondents'] * 100):.1f}%",
+                f"{results['total_respondents']:,.0f}"
+            ]
+        })
+        summary_df.to_excel(writer, sheet_name='Summary', index=False)
+
+        # Add detailed metrics sheet
+        reach_metrics_df.to_excel(writer, sheet_name='Detailed Metrics', index=False)
+
+        # Create charts sheet
+        chart_sheet = workbook.add_worksheet('Charts')
+
+        # Add reach comparison chart
+        chart1 = workbook.add_chart({'type': 'column'})
+
+        # Write data for the chart
+        chart_data = pd.DataFrame({
+            'Feature': viz_data['Feature'],
+            'Marginal Reach (%)': viz_data['Marginal Pct'],
+            'Incremental Reach (%)': viz_data['Incremental Pct'],
+            'Cumulative Reach (%)': viz_data['Cumulative Pct']
+        })
+        chart_data.to_excel(writer, sheet_name='ChartData', index=False)
+
+        # Configure the chart
+        chart1.add_series({
+            'name': 'Marginal Reach (%)',
+            'categories': '=ChartData!$A$2:$A$' + str(len(best_combo) + 1),
+            'values': '=ChartData!$B$2:$B$' + str(len(best_combo) + 1),
+        })
+
+        chart1.add_series({
+            'name': 'Incremental Reach (%)',
+            'categories': '=ChartData!$A$2:$A$' + str(len(best_combo) + 1),
+            'values': '=ChartData!$C$2:$C$' + str(len(best_combo) + 1),
+        })
+
+        # Add line series for cumulative reach
+        chart1.add_series({
+            'name': 'Cumulative Reach (%)',
+            'categories': '=ChartData!$A$2:$A$' + str(len(best_combo) + 1),
+            'values': '=ChartData!$D$2:$D$' + str(len(best_combo) + 1),
+            'type': 'line',
+            'marker': {'type': 'automatic'},
+            'line': {'color': 'red', 'width': 2},
+        })
+
+        # Configure chart layout
+        chart1.set_title({'name': 'Reach Analysis by Feature'})
+        chart1.set_x_axis({'name': 'Features'})
+        chart1.set_y_axis({'name': 'Reach Percentage (%)'})
+        chart1.set_size({'width': 720, 'height': 400})
+
+        # Insert chart into the chart sheet
+        chart_sheet.insert_chart('B2', chart1)
+
+        # Add raw data sheet
+        df.to_excel(writer, sheet_name='Raw Data', index=True)
+
+        # Set column widths
+        for sheet in workbook.worksheets():
+            sheet.set_column('A:Z', 15)  # Set width for all columns
+
+    # Prepare the Excel file for download
+    output.seek(0)
+    return output
 
 def main():
     st.title("📊 TURF Analysis Tool")
@@ -217,7 +301,8 @@ def main():
             - **Incremental Reach**: Additional respondents reached by adding each feature
             - **Cumulative Reach**: Total respondents reached up to and including each feature
             """)
-            st.table(pd.DataFrame(reach_metrics))
+            reach_metrics_df = pd.DataFrame(reach_metrics)
+            st.table(reach_metrics_df)
 
             # Create enhanced reach visualization
             st.subheader("Reach Analysis Visualization")
@@ -325,17 +410,36 @@ def main():
                 ]
             })
 
-            csv = results_df.to_csv(index=False)
-            st.download_button(
-                label="Download Results",
-                data=csv,
-                file_name="turf_analysis_results.csv",
-                mime="text/csv"
-            )
+            # Download buttons
+            col1, col2 = st.columns(2)
+
+            with col1:
+                csv = results_df.to_csv(index=False)
+                st.download_button(
+                    label="Download Summary (CSV)",
+                    data=csv,
+                    file_name="turf_analysis_summary.csv",
+                    mime="text/csv"
+                )
+
+            with col2:
+                excel_file = create_excel_report(
+                    results=results,
+                    df=df,
+                    best_combo=best_combo,
+                    reach_metrics_df=reach_metrics_df,
+                    viz_data=viz_data
+                )
+
+                st.download_button(
+                    label="Download Full Report (Excel)",
+                    data=excel_file,
+                    file_name=f"turf_analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
             if max_combinations > 3:
                 progress_msg.empty()
-
 
 if __name__ == "__main__":
     main()
