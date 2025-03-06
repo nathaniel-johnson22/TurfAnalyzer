@@ -170,6 +170,110 @@ def main():
             fig.update_layout(showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
+
+            # Create reach metrics table
+            reach_metrics = []
+            cumulative_reach = 0
+            previous_reach = 0
+
+            for i, feature in enumerate(best_combo):
+                current_combo = best_combo[:i+1]
+                feature_reach = df[feature].sum()
+                reach_pct = (feature_reach / total_respondents) * 100
+
+                current_total_reach = results['incremental_reach'][i]
+                incremental_reach = current_total_reach - previous_reach
+                incremental_pct = (incremental_reach / total_respondents) * 100
+
+                reach_metrics.append({
+                    'Feature': feature,
+                    'Marginal Reach': f"{feature_reach:,.0f} ({reach_pct:.1f}%)",
+                    'Incremental Reach': f"{incremental_reach:,.0f} ({incremental_pct:.1f}%)",
+                    'Cumulative Reach': f"{current_total_reach:,.0f} ({results['reach_percentages'][i]:.1f}%)"
+                })
+
+                previous_reach = current_total_reach
+
+            # Display metrics table
+            st.subheader("Detailed Reach Metrics")
+            st.markdown("""
+            - **Marginal Reach**: Number of respondents reached by each feature individually
+            - **Incremental Reach**: Additional respondents reached by adding each feature
+            - **Cumulative Reach**: Total respondents reached up to and including each feature
+            """)
+            st.table(pd.DataFrame(reach_metrics))
+
+            # Create enhanced reach visualization
+            st.subheader("Reach Analysis Visualization")
+
+            # Prepare data for visualization
+            viz_data = pd.DataFrame(reach_metrics)
+            viz_data[['Marginal Count', 'Marginal Pct']] = viz_data['Marginal Reach'].str.extract(r'(\d+,?\d*) \(([\d.]+)%\)')
+            viz_data[['Incremental Count', 'Incremental Pct']] = viz_data['Incremental Reach'].str.extract(r'(\d+,?\d*) \(([\d.]+)%\)')
+            viz_data[['Cumulative Count', 'Cumulative Pct']] = viz_data['Cumulative Reach'].str.extract(r'(\d+,?\d*) \(([\d.]+)%\)')
+
+            # Convert percentage strings to float
+            viz_data['Marginal Pct'] = viz_data['Marginal Pct'].astype(float)
+            viz_data['Incremental Pct'] = viz_data['Incremental Pct'].astype(float)
+            viz_data['Cumulative Pct'] = viz_data['Cumulative Pct'].astype(float)
+
+            # Create figure with secondary y-axis
+            fig = go.Figure()
+
+            # Add bars for marginal reach
+            fig.add_trace(go.Bar(
+                name='Marginal Reach',
+                x=viz_data['Feature'],
+                y=viz_data['Marginal Pct'],
+                text=viz_data['Marginal Pct'].round(1).astype(str) + '%',
+                textposition='auto',
+            ))
+
+            # Add bars for incremental reach
+            fig.add_trace(go.Bar(
+                name='Incremental Reach',
+                x=viz_data['Feature'],
+                y=viz_data['Incremental Pct'],
+                text=viz_data['Incremental Pct'].round(1).astype(str) + '%',
+                textposition='auto',
+            ))
+
+            # Add line for cumulative reach
+            fig.add_trace(go.Scatter(
+                name='Cumulative Reach',
+                x=viz_data['Feature'],
+                y=viz_data['Cumulative Pct'],
+                mode='lines+markers+text',
+                text=viz_data['Cumulative Pct'].round(1).astype(str) + '%',
+                textposition='top center',
+                line=dict(color='red', width=2),
+                yaxis='y2'
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title='Reach Analysis by Feature',
+                xaxis_title='Features',
+                yaxis_title='Reach Percentage (%)',
+                barmode='group',
+                yaxis2=dict(
+                    title='Cumulative Reach (%)',
+                    overlaying='y',
+                    side='right'
+                ),
+                yaxis=dict(range=[0, 100]),
+                yaxis2_range=[0, 100],
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                )
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
             # Display incremental reach
             st.subheader("Incremental Reach Analysis")
             incremental_data = pd.DataFrame({
