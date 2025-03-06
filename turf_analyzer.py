@@ -54,9 +54,19 @@ class TURFAnalyzer:
         incremental_reach = []
         reach_percentages = []
 
+        # Early optimization - get individual reach values first
+        individual_reach = {feature: self.calculate_combined_reach([feature]) 
+                          for feature in self.features}
+
+        # Sort features by individual reach for faster convergence
+        sorted_features = sorted(self.features, 
+                               key=lambda x: individual_reach[x], 
+                               reverse=True)
+
         # Try combinations of different sizes
         for size in range(1, max_combinations + 1):
-            for combo in combinations(self.features, size):
+            # Only try combinations with high-potential features first
+            for combo in combinations(sorted_features[:min(len(sorted_features), size + 5)], size):
                 reach = self.calculate_combined_reach(combo)
 
                 if reach > max_reach:

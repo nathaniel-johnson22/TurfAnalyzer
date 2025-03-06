@@ -114,17 +114,33 @@ def main():
             )
 
         with col2:
+            # Calculate maximum allowed combinations
+            max_allowed = len(selected_features)
+            suggested_max = min(5, max_allowed)  # Default suggestion of 5 or less
+
             max_combinations = st.number_input(
                 "Maximum number of features to combine:",
                 min_value=1,
-                max_value=len(selected_features) if selected_features else 1,
-                value=min(3, len(selected_features)) if selected_features else 1
+                max_value=max_allowed if selected_features else 1,
+                value=suggested_max if selected_features else 1,
+                help="Select how many features to combine. Higher numbers will take longer to analyze."
             )
+
+            # Add warning for large combinations
+            if max_combinations > 5:
+                st.warning(
+                    "Analyzing many combinations may take longer. "
+                    "Consider starting with fewer combinations first."
+                )
 
         if st.button("Run TURF Analysis", type="primary"):
             if len(selected_features) < 1:
                 st.warning("Please select at least one feature.")
                 return
+
+            # Show progress message for larger analyses
+            if max_combinations > 3:
+                progress_msg = st.info("Analyzing combinations... This may take a moment.")
 
             # Perform TURF analysis
             analyzer = TURFAnalyzer(df[selected_features])
@@ -316,6 +332,10 @@ def main():
                 file_name="turf_analysis_results.csv",
                 mime="text/csv"
             )
+
+            if max_combinations > 3:
+                progress_msg.empty()
+
 
 if __name__ == "__main__":
     main()
