@@ -4,57 +4,53 @@ import numpy as np
 def validate_data(df):
     """
     Validate the input data format
-    
+
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    
+    df (pd.DataFrame): Input DataFrame where:
+        - Each row represents a respondent
+        - Each column represents a feature
+        - Values are binary (0/1 or True/False)
+
     Returns:
     bool: True if valid, False otherwise
     """
-    required_columns = {'Feature', 'Reach'}
-    
-    # Check if required columns exist
-    if not all(col in df.columns for col in required_columns):
+    # Check if there are any columns (features)
+    if len(df.columns) == 0:
         return False
-    
-    # Check if there are any null values
-    if df[list(required_columns)].isnull().any().any():
+
+    # Check if there are any rows (respondents)
+    if len(df) == 0:
         return False
-    
-    # Check if reach values are numeric and positive
-    if not all(df['Reach'].apply(lambda x: isinstance(x, (int, float)) and x > 0)):
-        return False
-    
-    # Check if features are unique
-    if len(df['Feature'].unique()) != len(df['Feature']):
-        return False
-    
+
+    # Check if all values are binary (0/1 or True/False)
+    for col in df.columns:
+        unique_vals = df[col].unique()
+        valid_values = {0, 1, True, False}
+        if not set(unique_vals).issubset(valid_values):
+            return False
+
     return True
 
 def create_sample_data():
     """
     Create sample data for demonstration
-    
+
     Returns:
-    pd.DataFrame: Sample reach data
+    pd.DataFrame: Sample respondent-level data with binary feature indicators
     """
-    sample_data = {
-        'Feature': [
-            'Email Newsletter',
-            'Social Media Ads',
-            'Search Engine Marketing',
-            'Content Marketing',
-            'Display Advertising',
-            'Influencer Marketing'
-        ],
-        'Reach': [
-            15000,
-            25000,
-            20000,
-            12000,
-            18000,
-            22000
-        ]
-    }
-    
-    return pd.DataFrame(sample_data)
+    np.random.seed(42)
+    n_respondents = 100
+    features = [
+        'Email Newsletter',
+        'Social Media Ads',
+        'Search Engine Marketing',
+        'Content Marketing',
+        'Display Advertising',
+        'Influencer Marketing'
+    ]
+
+    # Generate random binary data
+    data = np.random.randint(0, 2, size=(n_respondents, len(features)))
+    df = pd.DataFrame(data, columns=features)
+
+    return df
