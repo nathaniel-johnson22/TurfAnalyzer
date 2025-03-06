@@ -20,6 +20,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+def get_top_features(df, n=5):
+    """Get the top n features by total reach"""
+    feature_reach = df.sum().sort_values(ascending=False)
+    return feature_reach.index.tolist()[:n]
+
 def main():
     st.title("📊 TURF Analysis Tool")
     st.markdown("""
@@ -86,19 +91,34 @@ def main():
         st.header("Feature Selection")
         col1, col2 = st.columns([2, 1])
 
+        # Get feature reach information
+        feature_reach = df.sum().sort_values(ascending=False)
+        feature_reach_pct = (feature_reach / len(df) * 100).round(1)
+
+        # Display feature reach information
+        st.subheader("Feature Reach Overview")
+        reach_df = pd.DataFrame({
+            'Feature': feature_reach.index,
+            'Respondents Reached': feature_reach.values,
+            'Reach %': feature_reach_pct.values
+        })
+        st.dataframe(reach_df)
+
         with col1:
+            default_features = get_top_features(df, n=min(5, len(df.columns)))
             selected_features = st.multiselect(
                 "Select features to include in analysis:",
-                df.columns.tolist(),
-                default=df.columns.tolist()[:3]
+                options=feature_reach.index.tolist(),  # Show features sorted by reach
+                default=default_features,
+                help="Features are sorted by total reach. Top features are selected by default."
             )
 
         with col2:
             max_combinations = st.number_input(
                 "Maximum number of features to combine:",
                 min_value=1,
-                max_value=len(selected_features),
-                value=min(3, len(selected_features))
+                max_value=len(selected_features) if selected_features else 1,
+                value=min(3, len(selected_features)) if selected_features else 1
             )
 
         if st.button("Run TURF Analysis", type="primary"):
